@@ -16,98 +16,96 @@
 
 using namespace std;
 
-// Función para calcular checksum (suma de los valores de los datos)
-string calculate_checksum(const string &data) {
+// Función para calcular un checksum simple
+int calculate_checksum(const std::string& data) {
     int checksum = 0;
     for (char c : data) {
         checksum += c;
     }
-    return to_string(checksum % 10000); // Limitar a 4 dígitos
+    return checksum % 10000; // Retorna un checksum de 4 dígitos
 }
 
 // Protocolo de envío de matriz de adyacencia
-int write_adjacency_protocol(char *buf, int total_nodes, int node, const vector<float> &data) {
-    ostringstream data_stream;
+//int write_adjacency_protocol(char *buf, int total_nodes, int node, const vector<float> &data) {
+// Función para escribir el protocolo de matriz de adyacencia
+int write_adjacency_protocol(char* buf, int total_nodes, int node, const std::vector<float>& data) {
+    std::ostringstream oss;
     for (size_t i = 0; i < data.size(); ++i) {
-        data_stream << fixed << setprecision(1) << data[i];
-        if (i < data.size() - 1) {
-            data_stream << "#";
-        }
+        oss << std::fixed << std::setprecision(1) << data[i];
+        if (i != data.size() - 1) oss << "#";
     }
-
-    string serialized_data = data_stream.str();
-    string checksum = calculate_checksum(serialized_data);
-    int tam_data = serialized_data.size();
+    std::string data_str = oss.str();
+    int checksum = calculate_checksum(data_str);
+    int data_size = data_str.size();
 
     memset(buf, 0, sizeof(buf));
-    sprintf(buf, "A%05d%05d%s%06d%s", total_nodes, node, checksum.c_str(), tam_data, serialized_data.c_str());
-    return strlen(buf);
+    sprintf(buf, "A%05d%05d%04d%06d%s", total_nodes, node, checksum, data_size, data_str.c_str());
+    return 1 + 5 + 5 + 4 + 6 + data_size; // Tamaño total del mensaje
 }
 
-// Protocolo de envío de matriz de características
-int write_features_protocol(char *buf, int tam_de_este, int total_nodes, int node, int cant_carac, const vector<float> &data) {
-    ostringstream data_stream;
+// Función para escribir el protocolo de matriz de características
+int write_features_protocol(char* buf, int total_nodes, int node, int num_features, const std::vector<float>& data) {
+    std::ostringstream oss;
     for (size_t i = 0; i < data.size(); ++i) {
-        data_stream << fixed << setprecision(1) << data[i];
-        if (i < data.size() - 1) {
-            data_stream << "#";
-        }
+        oss << std::fixed << std::setprecision(1) << data[i];
+        if (i != data.size() - 1) oss << "#";
     }
-
-    string serialized_data = data_stream.str();
-    string checksum = calculate_checksum(serialized_data);
-    int tam_data = serialized_data.size();
+    std::string data_str = oss.str();
+    int checksum = calculate_checksum(data_str);
+    int data_size = data_str.size();
 
     memset(buf, 0, sizeof(buf));
-    sprintf(buf, "C%06d%05d%05d%04d%s%06d%s", tam_de_este, total_nodes, node, cant_carac, checksum.c_str(), tam_data, serialized_data.c_str());
-    return strlen(buf);
+    sprintf(buf, "C%05d%05d%05d%04d%06d%s", total_nodes, node, num_features, checksum, data_size, data_str.c_str());
+    return 1 + 5 + 5 + 5 + 4 + 6 + data_size; // Tamaño total del mensaje
 }
+
+
 /////////////////////////////////////////77777
-int write_sintaxis(char * buf, string &tex)
-{
+int write_sintaxis(char* buf, string& tex) {
     memset(buf, 0, sizeof(buf));
     int tam = tex.size();
-    if(tex=="chau")
-    {
+    
+    if (tex == "chau") {
         memset(buf, 0, sizeof(buf));
-        buf[0]='o';
-        buf[1]='\0';
+        buf[0] = 'o';
+        buf[1] = '\0';
         return 1;
-    }
-    else if(tex=="Quien esta"){
+    } else if (tex == "Quien esta") {
         memset(buf, 0, sizeof(buf));
-        buf[0]='l';
-        buf[1]='\0';
+        buf[0] = 'l';
+        buf[1] = '\0';
         return 1;
-    }
-    else
-    {
+    } else {
         size_t pos = tex.find(':');
-        string form= tex.substr(0, pos);
-        if (form=="msg")
-        {
-            int tam_name,tam_msg;
-            tex=tex.substr(pos + 1);
+        string form = tex.substr(0, pos);
+
+        if (form == "msg") {
+            int tam_name, tam_msg;
+            tex = tex.substr(pos + 1);
             size_t pos = tex.find(':');
             string name = tex.substr(0, pos);
             string msg = tex.substr(pos + 1);
-            tam_name=name.size();
-            tam_msg=msg.size();
+            tam_name = name.size();
+            tam_msg = msg.size();
             memset(buf, 0, sizeof(buf));
-            sprintf(buf, "m%04d%s%05d%s", tam_name, name.c_str(),tam_msg,msg.c_str() );
-            //printf("[%s]\n",buf);
-            return tam_name+tam_msg+1+4+5;
-        }
-        else if(form=="Nickname"){
+            sprintf(buf, "m%04d%s%05d%s", tam_name, name.c_str(), tam_msg, msg.c_str());
+            return tam_name + tam_msg + 1 + 4 + 5;
+        } else if (form == "Nickname") {
             int tam_name;
             string name = tex.substr(pos + 2);
-            tam_name=name.size();
+            tam_name = name.size();
             memset(buf, 0, sizeof(buf));
             sprintf(buf, "n%04d%s", tam_name, name.c_str());
-            //printf("[%s]\n",buf);
-            return tam+5;
+            return tam_name + 5;
+        } else if (form == "MA") { // Matriz de adyacencia
+            vector<float> adjacency_data = {1.5, 5, 12, 48, 13}; // Ejemplo
+            return write_adjacency_protocol(buf, 5, 1, adjacency_data);
+        } else if (form == "MC") { // Matriz de características
+            std::vector<float> feature_data = {2.3, 4.1, 3.3, 5.2}; // Ejemplo
+            return write_features_protocol(buf, 5, 1, 4, feature_data);
         }
     }
+
     return 0;
 }
 
@@ -173,10 +171,10 @@ void read_thread(int socketRead) {
 
             cout << "Protocolo A recibido: Nodo " << node << " con " << tam_data << " datos.\n"
                  << "Datos: " << data << "\nChecksum: " << checksum << endl;
-        
 
-    } else if (buffer[0]== 'C') { // Protocolo matriz_características
-     int tam_de_este, total_nodes, node, cant_carac, tam_data;
+    }
+    else if (buffer[0]== 'C') { // Protocolo matriz_características
+    int tam_de_este, total_nodes, node, cant_carac, tam_data;
             char checksum[5], data[1000];
 
             read(socketRead, buffer, 6);
@@ -262,44 +260,27 @@ int main() {
     }
 
     std::cout << "Conectado al servidor TCP exitosamente.\n";
-/*
-    while (true) {
-        struct sockaddr_in clientAddr;
-        socklen_t clientLen = sizeof(clientAddr);
-        int clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddr, &clientLen);
-        if (clientSocket == -1) {
-            perror("Error al aceptar conexión");
-            continue;
-        }
-
-        cout << "Cliente conectado." << endl;
-        thread clientThread(read_thread, clientSocket);
-        clientThread.detach();
-    }
-
-    close(serverSocket);
-*/
-    int n;  
-  string buff;
-  string nicname="Nickname: ";
-  cout << nicname;
-  getline(cin, buff);
-  char s[100000];
-  nicname=nicname+buff;
-  int tam = write_sintaxis(s,nicname);
-  n = write(serverSocket,s,tam);
-  char buffer[255];
-  thread(read_thread,serverSocket).detach();
-  do{
+        int n;  
+    string buff;
+    string nicname="Nickname: ";
+    cout << nicname;
     getline(cin, buff);
-    int tam = write_sintaxis(s,buff);
+    char s[100000];
+    nicname=nicname+buff;
+    int tam = write_sintaxis(s,nicname);
     n = write(serverSocket,s,tam);
+    char buffer[255];
+    thread(read_thread,serverSocket).detach();
+    do{
+        getline(cin, buff);
+        int tam = write_sintaxis(s,buff);
+        n = write(serverSocket,s,tam);
 
-    vector<float> adjacency_data = {1.5, 5, 12, 48, 13};
-    int tam1 = write_adjacency_protocol(buffer, 5, 1, adjacency_data);
-    write(serverSocket, buffer, tam1);
-  }
-  while(buff!="chau");
+        //vector<float> adjacency_data = {1.5, 5, 12, 48, 13};
+        //int tam1 = write_adjacency_protocol(buffer, 5, 1, adjacency_data);
+        //write(serverSocket, buffer, tam1);
+    }
+    while(buff!="chau");
     
  
   shutdown(serverSocket, SHUT_RDWR);
