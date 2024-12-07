@@ -107,18 +107,22 @@ int write_sintaxis(char* buf, string& tex) {
             sprintf(buf, "n%04d%s", tam_name, name.c_str());
             return tam_name + 5;
         } else if (form == "MA") { // Matriz de adyacencia
-           // vector<float> adjacency_data = {1.5, 5, 12, 48, 13}; // Ejemplo
-            //return write_adjacency_protocol(buf, 5, 1, adjacency_data);
-
             vector<float> adjacency_data = {1.5, 5, 12, 48, 13}; // Ejemplo
             int tam = write_adjacency_protocol(buf, 5, 1, adjacency_data);
             std::cout << "Protocolo matriz de adyacencia enviado: " << buf << std::endl;
             return tam;
         } else if (form == "MC") { // Matriz de características
-            std::vector<float> feature_data = {2.3, 4.1, 3.3, 5.2}; // Ejemplo
+            vector<float> feature_data = {2.3, 4.1, 3.3, 5.2}; // Ejemplo
             int tam = write_features_protocol(buf, 5, 1, 4, feature_data);
-            std::cout << "Protocolo matriz de características enviado: " << buf << std::endl;
+            cout << "Protocolo matriz de características enviado: " << buf << std::endl;
             return tam;
+        }
+        else if (form == "ACK") { // Protocolo ACK
+            int packet_number = stoi(tex.substr(pos + 1)); // Obtener número de paquete
+            memset(buf, 0, sizeof(buf));
+            sprintf(buf, "ACK|%05d", packet_number);
+            return strlen(buf); // Retorna la longitud del mensaje calculada dinámicamente
+        
         }
     }
 
@@ -238,6 +242,21 @@ void read_thread(int socketRead) {
              << ", Recibido: " << checksum << endl;
     }
 }
+    else if (protocol == 'K') { // Protocolo ACK
+            char ack_buffer[10];
+            n = read(socketRead, ack_buffer, 10); // Leer el contenido de ACK|NUMDEPAQUETE
+            ack_buffer[n] = '\0';
+            string ack_msg(ack_buffer);
+
+            size_t pos = ack_msg.find('|');
+            if (pos != string::npos && ack_msg.substr(0, pos) == "ACK") {
+                string packet_num = ack_msg.substr(pos + 1);
+                cout << "Se recibió el ACK de: " << packet_num << endl;
+            } else {
+                cerr << "Formato de ACK inválido: " << ack_msg << endl;
+            }
+
+    }
 
     else {
             cerr << "Protocolo desconocido: " << protocol << endl;
