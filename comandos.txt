@@ -1,0 +1,13 @@
+Abra un cliente SSH.
+
+Localice el archivo de clave privada. La clave utilizada para lanzar esta instancia es RayitoVeloz.pem
+
+Ejecute este comando, si es necesario, para garantizar que la clave no se pueda ver públicamente.
+chmod 400 "RayitoVeloz.pem"
+
+Conéctese a la instancia mediante su DNS público:
+ec2-18-117-146-57.us-east-2.compute.amazonaws.com
+
+Ejemplo:
+
+ssh -i "RayitoVeloz.pem" ubuntu@ec2-18-117-146-57.us-east-2.compute.amazonaws.com
