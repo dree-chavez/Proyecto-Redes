@@ -28,7 +28,7 @@ int calculate_checksum(const std::string& data) {
 // Protocolo de envío de matriz de adyacencia
 //int write_adjacency_protocol(char *buf, int total_nodes, int node, const vector<float> &data) {
 // Función para escribir el protocolo de matriz de adyacencia
-int write_adjacency_protocol(char* buf, int total_nodes, int node, const std::vector<float>& data) {
+int write_adjacency_protocol(char* buf, int total_nodes, int node, const vector<float>& data) {
     std::ostringstream oss;
     for (size_t i = 0; i < data.size(); ++i) {
         oss << std::fixed << std::setprecision(1) << data[i];
@@ -46,16 +46,25 @@ int write_adjacency_protocol(char* buf, int total_nodes, int node, const std::ve
 // Función para escribir el protocolo de matriz de características
 int write_features_protocol(char* buf, int total_nodes, int node, int num_features, const std::vector<float>& data) {
     std::ostringstream oss;
+
+    // Serializar los datos separados por '#'
     for (size_t i = 0; i < data.size(); ++i) {
         oss << std::fixed << std::setprecision(1) << data[i];
         if (i != data.size() - 1) oss << "#";
     }
     std::string data_str = oss.str();
+
+    // Calcular checksum
     int checksum = calculate_checksum(data_str);
+
+    // Tamaño de los datos
     int data_size = data_str.size();
 
+    // Crear el mensaje
     memset(buf, 0, sizeof(buf));
     sprintf(buf, "C%05d%05d%05d%04d%06d%s", total_nodes, node, num_features, checksum, data_size, data_str.c_str());
+
+    // Imprimir el protocolo para depuración
     return 1 + 5 + 5 + 5 + 4 + 6 + data_size; // Tamaño total del mensaje
 }
 
@@ -98,11 +107,18 @@ int write_sintaxis(char* buf, string& tex) {
             sprintf(buf, "n%04d%s", tam_name, name.c_str());
             return tam_name + 5;
         } else if (form == "MA") { // Matriz de adyacencia
+           // vector<float> adjacency_data = {1.5, 5, 12, 48, 13}; // Ejemplo
+            //return write_adjacency_protocol(buf, 5, 1, adjacency_data);
+
             vector<float> adjacency_data = {1.5, 5, 12, 48, 13}; // Ejemplo
-            return write_adjacency_protocol(buf, 5, 1, adjacency_data);
+            int tam = write_adjacency_protocol(buf, 5, 1, adjacency_data);
+            std::cout << "Protocolo matriz de adyacencia enviado: " << buf << std::endl;
+            return tam;
         } else if (form == "MC") { // Matriz de características
             std::vector<float> feature_data = {2.3, 4.1, 3.3, 5.2}; // Ejemplo
-            return write_features_protocol(buf, 5, 1, 4, feature_data);
+            int tam = write_features_protocol(buf, 5, 1, 4, feature_data);
+            std::cout << "Protocolo matriz de características enviado: " << buf << std::endl;
+            return tam;
         }
     }
 
@@ -173,40 +189,57 @@ void read_thread(int socketRead) {
                  << "Datos: " << data << "\nChecksum: " << checksum << endl;
 
     }
-    else if (buffer[0]== 'C') { // Protocolo matriz_características
-    int tam_de_este, total_nodes, node, cant_carac, tam_data;
-            char checksum[5], data[1000];
+    else if (buffer[0] == 'C') { // Protocolo matriz_características
+    int total_nodes, node, num_features, tam_data;
+    char checksum[5], data[10000];
 
-            read(socketRead, buffer, 6);
-            buffer[6] = '\0';
-            tam_de_este = atoi(buffer);
+    // Leer total de nodos
+    read(socketRead, buffer, 5);
+    buffer[5] = '\0';
+    total_nodes = atoi(buffer);
 
-            read(socketRead, buffer, 5);
-            buffer[5] = '\0';
-            total_nodes = atoi(buffer);
+    // Leer número de nodo
+    read(socketRead, buffer, 5);
+    buffer[5] = '\0';
+    node = atoi(buffer);
 
-            read(socketRead, buffer, 5);
-            buffer[5] = '\0';
-            node = atoi(buffer);
+    // Leer número de características
+    read(socketRead, buffer, 5);
+    buffer[5] = '\0';
+    num_features = atoi(buffer);
 
-            read(socketRead, buffer, 4);
-            buffer[4] = '\0';
-            cant_carac = atoi(buffer);
+    // Leer checksum
+    read(socketRead, checksum, 4);
+    checksum[4] = '\0';
 
-            read(socketRead, checksum, 4);
-            checksum[4] = '\0';
+    // Leer tamaño de los datos
+    read(socketRead, buffer, 6);
+    buffer[6] = '\0';
+    tam_data = atoi(buffer);
 
-            read(socketRead, buffer, 6);
-            buffer[6] = '\0';
-            tam_data = atoi(buffer);
+    // Leer los datos
+    read(socketRead, data, tam_data);
+    data[tam_data] = '\0';
 
-            read(socketRead, data, tam_data);
-            data[tam_data] = '\0';
+    cout << "Protocolo C recibido:\n";
+    cout << "  Nodo: " << node << "\n";
+    cout << "  Total Nodos: " << total_nodes << "\n";
+    cout << "  Número de Características: " << num_features << "\n";
+    cout << "  Tamaño de Datos: " << tam_data << "\n";
+    cout << "  Datos: " << data << "\n";
+    cout << "  Checksum: " << checksum << endl;
 
-            cout << "Protocolo C recibido: Nodo " << node << " con " << tam_data << " datos y "
-                 << cant_carac << " características.\n"
-                 << "Datos: " << data << "\nChecksum: " << checksum << endl;
-        } else {
+    // Validar checksum
+    int calculated_checksum = calculate_checksum(data);
+    if (calculated_checksum == atoi(checksum)) {
+        cout << "Checksum válido.\n";
+    } else {
+        cerr << "Error: Checksum inválido. Calculado: " << calculated_checksum
+             << ", Recibido: " << checksum << endl;
+    }
+}
+
+    else {
             cerr << "Protocolo desconocido: " << protocol << endl;
         }
     }
