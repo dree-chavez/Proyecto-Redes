@@ -117,14 +117,16 @@ int write_sintaxis(char* buf, string& tex, int socketRead) {
             memset(buf, 0, sizeof(buf));
             sprintf(buf, "m%04d%s%05d%s", tam_name, name.c_str(), tam_msg, msg.c_str());
             return tam_name + tam_msg + 1 + 4 + 5;
-        } else if (form == "Nickname") {
+        }
+        else if (form == "Nickname") {
             int tam_name;
             string name = tex.substr(pos + 2);
             tam_name = name.size();
             memset(buf, 0, sizeof(buf));
             sprintf(buf, "n%04d%s", tam_name, name.c_str());
             return tam_name + 5;
-        } else if (form == "MA") { // Matriz de adyacencia
+        }
+        else if (form == "MA") { // Matriz de adyacencia
 
             vector<vector<float>> adjacency_matrix = read_csv("adjacency_matrix.csv");
             int total_nodes = adjacency_matrix.size();
@@ -132,7 +134,7 @@ int write_sintaxis(char* buf, string& tex, int socketRead) {
                 cout << "Se ha leído el nodo #" << i + 1 << endl;
                 int tam = write_adjacency_protocol(buf, total_nodes, i + 1, adjacency_matrix[i]);
                 write(socketRead, buf, tam); // Aquí reemplaza '1' con el socket de conexión
-                this_thread::sleep_for(std::chrono::milliseconds(100)); // Añadido aquí
+                this_thread::sleep_for(std::chrono::milliseconds(200)); // Añadido aquí
                 
             }
             return tam;
@@ -224,7 +226,7 @@ void read_thread(int socketRead) {
 
             cout << "Protocolo A recibido: Nodo " << node << " con " << tam_data << " datos.\n"
                  << "Datos: " << data << "\nChecksum: " << checksum << endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Añadido aquí
+        std::this_thread::sleep_for(std::chrono::milliseconds(200)); // Añadido aquí
     }
     else if (buffer[0] == 'C') { // Protocolo matriz_características
     int total_nodes, node, num_features, tam_data;
