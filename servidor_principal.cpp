@@ -8,11 +8,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <netdb.h>
 #include <thread>
+#include <chrono>
 #include <vector>
 #include <sstream>
 #include <iomanip> 
-#include <netdb.h>
 
 using namespace std;
 
@@ -24,11 +25,37 @@ int calculate_checksum(const std::string& data) {
     }
     return checksum % 10000; // Retorna un checksum de 4 dígitos
 }
+#include <fstream>
+#include <sstream>
+#include <vector>
+#include <iostream>
+#include <string>
 
-// Protocolo de envío de matriz de adyacencia
-//int write_adjacency_protocol(char *buf, int total_nodes, int node, const vector<float> &data) {
-// Función para escribir el protocolo de matriz de adyacencia
-int write_adjacency_protocol(char* buf, int total_nodes, int node, const vector<float>& data) {
+using namespace std;
+
+// Función para leer un archivo CSV y cargar datos en una matriz
+vector<vector<float>> read_csv(const string& filename) {
+    vector<vector<float>> matrix;
+    ifstream file(filename);
+    if (!file.is_open()) {
+        cerr << "Error al abrir el archivo: " << filename << endl;
+        return matrix;
+    }
+    string line;
+    while (getline(file, line)) {
+        vector<float> row;
+        istringstream stream(line);
+        string value;
+        while (getline(stream, value, ',')) {
+            row.push_back(stof(value));
+        }
+        matrix.push_back(row);
+    }
+    return matrix;
+}
+
+// Protocolo para matriz de adyacencia
+int write_adjacency_protocol(char* buf, int total_nodes, int node, const std::vector<float>& data) {
     std::ostringstream oss;
     for (size_t i = 0; i < data.size(); ++i) {
         oss << std::fixed << std::setprecision(1) << data[i];
@@ -40,37 +67,28 @@ int write_adjacency_protocol(char* buf, int total_nodes, int node, const vector<
 
     memset(buf, 0, sizeof(buf));
     sprintf(buf, "A%05d%05d%04d%06d%s", total_nodes, node, checksum, data_size, data_str.c_str());
-    return 1 + 5 + 5 + 4 + 6 + data_size; // Tamaño total del mensaje
+    return strlen(buf);
 }
 
-// Función para escribir el protocolo de matriz de características
+// Protocolo para matriz de características
 int write_features_protocol(char* buf, int total_nodes, int node, int num_features, const std::vector<float>& data) {
     std::ostringstream oss;
-
-    // Serializar los datos separados por '#'
     for (size_t i = 0; i < data.size(); ++i) {
         oss << std::fixed << std::setprecision(1) << data[i];
         if (i != data.size() - 1) oss << "#";
     }
     std::string data_str = oss.str();
-
-    // Calcular checksum
     int checksum = calculate_checksum(data_str);
-
-    // Tamaño de los datos
     int data_size = data_str.size();
 
-    // Crear el mensaje
     memset(buf, 0, sizeof(buf));
     sprintf(buf, "C%05d%05d%05d%04d%06d%s", total_nodes, node, num_features, checksum, data_size, data_str.c_str());
-
-    // Imprimir el protocolo para depuración
-    return 1 + 5 + 5 + 5 + 4 + 6 + data_size; // Tamaño total del mensaje
+    return strlen(buf);
 }
 
 
 /////////////////////////////////////////77777
-int write_sintaxis(char* buf, string& tex) {
+int write_sintaxis(char* buf, string& tex, int socketRead) {
     memset(buf, 0, sizeof(buf));
     int tam = tex.size();
     
@@ -107,14 +125,29 @@ int write_sintaxis(char* buf, string& tex) {
             sprintf(buf, "n%04d%s", tam_name, name.c_str());
             return tam_name + 5;
         } else if (form == "MA") { // Matriz de adyacencia
-            vector<float> adjacency_data = {1.5, 5, 12, 48, 13}; // Ejemplo
-            int tam = write_adjacency_protocol(buf, 5, 1, adjacency_data);
-            std::cout << "Protocolo matriz de adyacencia enviado: " << buf << std::endl;
+
+            vector<vector<float>> adjacency_matrix = read_csv("adjacency_matrix.csv");
+            int total_nodes = adjacency_matrix.size();
+            for (int i = 0; i < total_nodes; ++i) {
+                cout << "Se ha leído el nodo #" << i + 1 << endl;
+                int tam = write_adjacency_protocol(buf, total_nodes, i + 1, adjacency_matrix[i]);
+                write(socketRead, buf, tam); // Aquí reemplaza '1' con el socket de conexión
+                this_thread::sleep_for(std::chrono::milliseconds(100)); // Añadido aquí
+                
+            }
             return tam;
+            
         } else if (form == "MC") { // Matriz de características
-            vector<float> feature_data = {2.3, 4.1, 3.3, 5.2}; // Ejemplo
-            int tam = write_features_protocol(buf, 5, 1, 4, feature_data);
-            cout << "Protocolo matriz de características enviado: " << buf << std::endl;
+
+           vector<vector<float>> feature_matrix = read_csv("feature_matrix.csv");
+            int total_nodes = feature_matrix.size();
+            for (int i = 0; i < total_nodes; ++i) {
+                cout << "Se ha leído el nodo #" << i + 1 << endl;
+                int tam = write_features_protocol(buf, total_nodes, i + 1, feature_matrix[i].size(), feature_matrix[i]);
+                
+                write(socketRead, buf, tam); // Aquí reemplaza '1' con el socket de conexión
+                this_thread::sleep_for(chrono::milliseconds(100)); // Añadido aquí
+            }
             return tam;
         }
         else if (form == "ACK") { // Protocolo ACK
@@ -169,9 +202,9 @@ void read_thread(int socketRead) {
     }
     else if (buffer[0]== 'A') { // Protocolo matriz_adyacencia
     int total_nodes, node, tam_data;
-            char checksum[5], data[1000];
+    char checksum[5], data[1000];
 
-            read(socketRead, buffer, 5);
+    read(socketRead, buffer, 5);
             buffer[5] = '\0';
             total_nodes = atoi(buffer);
 
@@ -191,7 +224,7 @@ void read_thread(int socketRead) {
 
             cout << "Protocolo A recibido: Nodo " << node << " con " << tam_data << " datos.\n"
                  << "Datos: " << data << "\nChecksum: " << checksum << endl;
-
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Añadido aquí
     }
     else if (buffer[0] == 'C') { // Protocolo matriz_características
     int total_nodes, node, num_features, tam_data;
@@ -241,6 +274,8 @@ void read_thread(int socketRead) {
         cerr << "Error: Checksum inválido. Calculado: " << calculated_checksum
              << ", Recibido: " << checksum << endl;
     }
+    std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Añadido aquí
+       
 }
     else if (protocol == 'K') { // Protocolo ACK
             char ack_buffer[10];
@@ -255,7 +290,7 @@ void read_thread(int socketRead) {
             } else {
                 cerr << "Formato de ACK inválido: " << ack_msg << endl;
             }
-
+        this_thread::sleep_for(std::chrono::milliseconds(100)); // Añadido aquí
     }
 
     else {
@@ -319,14 +354,14 @@ int main() {
     getline(cin, buff);
     char s[100000];
     nicname=nicname+buff;
-    int tam = write_sintaxis(s,nicname);
+    int tam = write_sintaxis(s,nicname, serverSocket);
     n = write(serverSocket,s,tam);
     char buffer[255];
     thread(read_thread,serverSocket).detach();
     do{
         getline(cin, buff);
-        int tam = write_sintaxis(s,buff);
-        n = write(serverSocket,s,tam);
+        int tam = write_sintaxis(s,buff, serverSocket);
+        //n = write(serverSocket,s,tam);
 
         //vector<float> adjacency_data = {1.5, 5, 12, 48, 13};
         //int tam1 = write_adjacency_protocol(buffer, 5, 1, adjacency_data);
